@@ -1,0 +1,12 @@
+{{ report_name }} ({{ report_id }})
+Report date: {{ report_date }}
+
+Key fields:
+{% for key, value in fields.items() -%}
+- {{ key }}: {{ value }}
+{% endfor %}
+
+Source URLs:
+{% for url in urls -%}
+- {{ url }}
+{% endfor %}
