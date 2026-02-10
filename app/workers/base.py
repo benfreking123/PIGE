@@ -74,7 +74,19 @@ class BaseWorker:
                         )
                         .all()
                     )
-                    if any(v.payload_hash == payload_hash for v in existing):
+                    matching = next((v for v in existing if v.payload_hash == payload_hash), None)
+                    if matching:
+                        existing_fields = matching.parsed_fields or {}
+                        merged = self._merge_parsed_fields(existing_fields, parsed_fields)
+                        has_new_keys = bool(set(parsed_fields.keys()) - set(existing_fields.keys()))
+                        has_value_changes = any(
+                            parsed_fields.get(key) != existing_fields.get(key)
+                            for key in parsed_fields.keys()
+                        )
+                        if has_new_keys or has_value_changes:
+                            matching.parsed_fields = merged
+                            db.add(matching)
+                            db.commit()
                         self._finalize_run(db, run, report_date, "published_no_change")
                         self.alert_service.clear_failure(db, self.config.report_id)
                         return True
@@ -179,6 +191,14 @@ class BaseWorker:
     def compute_hash_from_payloads(payloads: List[List[Dict[str, Any]]]) -> str:
         normalized = json.dumps(payloads, sort_keys=True, default=str)
         return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _merge_parsed_fields(existing: Dict[str, Any], new_fields: Dict[str, Any]) -> Dict[str, Any]:
+        merged = dict(existing)
+        for key, value in new_fields.items():
+            if key not in merged or merged[key] in (None, "", []) and value is not None:
+                merged[key] = value
+        return merged
 
     def _send_email(self, parsed_fields: Dict[str, Any], report_date: date, urls: List[str]) -> None:
         recipients = self._get_recipients()
