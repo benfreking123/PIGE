@@ -1,0 +1,43 @@
+Final Settlement
+There shall be no delivery of hogs in settlement of this contract. All contracts open as of the termination
+of trading shall be cash settled based upon the CME Lean Hog Index® for the two–day period ending
+on the day on which trading terminates.
+1. The Sample
+The sample consists of all producer-sold negotiated, and swine or pork market formula and negotiated
+formula barrows and gilts purchased on a lean value direct basis by packers for which the head count,
+average net price and average carcass weight are reported in the “National Daily Direct Hog Prior Day
+Report-Slaughtered Swine” released by the USDA.
+2. The Calculation
+The procedure for calculating the CME Lean Hog Index is as follows, using data reported on two
+consecutive weekdays.
+1. The daily head count for negotiated transactions is multiplied by the corresponding daily average
+carcass weight to obtain the negotiated daily total weight;
+2. The daily head count for swine or pork market formula transactions is multiplied by the
+corresponding daily average carcass weight to obtain the swine or pork market formula daily total
+weight;
+3. The daily head count for negotiated formula transactions is multiplied by the corresponding daily
+average carcass weight to obtain the negotiated formula daily total weight;
+34. The daily totals for negotiated weight (i.e., the result from 1. above), and swine or pork market
+formula weight (i.e., the result from 2. above) and negotiated formula weight (i.e., the result from 3.
+above) are added to obtain the daily total weight;
+45. The daily total weights (i.e., the result from 34. above) for two consecutively reported days are
+aggregated to obtain the two–day total weight;
+56. The negotiated daily total weight (i.e., the result from 1. above) is multiplied by the corresponding
+daily average net price to obtain the negotiated daily total value;
+67. The swine or pork market formula daily total weight (i.e., the result from 2. above) is multiplied by
+the corresponding daily average net price to obtain the swine or pork market formula daily total
+value;
+8. The negotiated formula daily total weight (i.e., the result from 3. above) is multiplied by the
+corresponding daily average net price to obtain the negotiated formula daily total value;
+79. The daily totals for negotiated value (i.e., the result from 56. above), and swine or pork market
+formula value (i.e. the result from 67. above) and negotiated formula value (i.e., the result from 8.
+above) are added to obtain the daily total value;
+810. The daily total values (i.e., the result from 79., above) for two consecutively reported days are
+aggregated to obtain the two–day total value; and
+911. The two–day total value (i.e., the result from 810., above) is divided by the two–day total weight
+(i.e., the result from 45., above) to obtain the CME Lean Hog Index.
+For the purposes of this rule, Friday of one week and Monday of the following week shall be considered
+to be consecutive weekdays.
+Also for the purposes of this rule, any days when the necessary data are not released by the USDA
+shall not be considered weekdays, in which case the first weekday immediately preceding and the first
+weekday immediately following such day(s) shall be considered two consecutive weekdays.

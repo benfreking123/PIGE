@@ -1,0 +1,44 @@
+[
+  {
+    "report_date": "02/09/2026",
+    "purchase_type": "Prod. Sold Negotiated",
+    "head_count": "10",
+    "avg_carcass_weight": "200",
+    "avg_net_price": "80"
+  },
+  {
+    "report_date": "02/09/2026",
+    "purchase_type": "Prod. Sold Swine or Pork Market Formula",
+    "head_count": "20",
+    "avg_carcass_weight": "200",
+    "avg_net_price": "70"
+  },
+  {
+    "report_date": "02/09/2026",
+    "purchase_type": "Prod. Sold Negotiated Formula",
+    "head_count": "5",
+    "avg_carcass_weight": "200",
+    "avg_net_price": "60"
+  },
+  {
+    "report_date": "02/06/2026",
+    "purchase_type": "Prod. Sold Negotiated",
+    "head_count": "8",
+    "avg_carcass_weight": "190",
+    "avg_net_price": "82"
+  },
+  {
+    "report_date": "02/06/2026",
+    "purchase_type": "Prod. Sold Swine or Pork Market Formula",
+    "head_count": "16",
+    "avg_carcass_weight": "190",
+    "avg_net_price": "72"
+  },
+  {
+    "report_date": "02/06/2026",
+    "purchase_type": "Prod. Sold Negotiated Formula",
+    "head_count": "4",
+    "avg_carcass_weight": "190",
+    "avg_net_price": "65"
+  }
+]
