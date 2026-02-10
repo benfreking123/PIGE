@@ -278,6 +278,21 @@ def api_logs(limit: int = 200) -> List[dict]:
     ]
 
 
+@app.post("/api/logs/clear")
+def api_logs_clear() -> dict:
+    """Delete all report runs, run events, and report versions (historical data)."""
+    with SessionLocal() as db:
+        deleted_events = db.query(ReportRunEvent).delete()
+        deleted_runs = db.query(ReportRun).delete()
+        deleted_versions = db.query(ReportVersion).delete()
+        db.commit()
+    return {
+        "deleted_events": deleted_events,
+        "deleted_runs": deleted_runs,
+        "deleted_versions": deleted_versions,
+    }
+
+
 @app.get("/reports")
 def list_reports() -> List[dict]:
     with SessionLocal() as db:

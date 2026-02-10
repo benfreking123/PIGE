@@ -49,4 +49,8 @@ export const api = {
   runReport: (id: string) => request(`/reports/${id}/run`, { method: "POST" }),
   getAlerts: () => request<AlertState[]>("/alerts"),
   getLogs: () => request<LogEvent[]>("/logs"),
+  clearReportData: () =>
+    request<{ deleted_events: number; deleted_runs: number; deleted_versions: number }>("/logs/clear", {
+      method: "POST",
+    }),
 };
