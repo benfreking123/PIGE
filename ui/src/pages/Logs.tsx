@@ -5,42 +5,15 @@ import { LogEvent } from "../types";
 export default function Logs() {
   const [events, setEvents] = useState<LogEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
-
-  const load = () => {
-    api.getLogs().then(setEvents).catch((err) => setError(String(err)));
-  };
 
   useEffect(() => {
-    load();
+    api.getLogs().then(setEvents).catch((err) => setError(String(err)));
   }, []);
-
-  const clearData = async () => {
-    setStatus(null);
-    setError(null);
-    const confirm = window.confirm(
-      "This will delete all report runs, versions, events, and alert data. Continue?"
-    );
-    if (!confirm) return;
-    try {
-      await api.clearData();
-      setStatus("Data cleared.");
-      load();
-    } catch (err) {
-      setError(String(err));
-    }
-  };
 
   return (
     <div>
       <h1>Logs</h1>
       {error && <div className="card">Error: {error}</div>}
-      {status && <div className="card">{status}</div>}
-      <div className="card">
-        <button className="button" onClick={clearData}>
-          Clear Database Data
-        </button>
-      </div>
       <table className="table">
         <thead>
           <tr>

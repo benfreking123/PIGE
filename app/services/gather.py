@@ -50,32 +50,6 @@ def fetch_range_payloads(
     return results
 
 
-def fetch_range_rows(config: ReportConfig, start_date: date, end_date: date) -> List[Dict[str, object]]:
-    rows: List[Dict[str, object]] = []
-    timeout = httpx.Timeout(connect=10.0, read=30.0, write=10.0, pool=10.0)
-    with httpx.Client(timeout=timeout) as client:
-        for endpoint in config.endpoints:
-            url = _build_range_url(endpoint, start_date, end_date)
-            resp = client.get(url)
-            resp.raise_for_status()
-            data = resp.json()
-            if isinstance(data, dict) and isinstance(data.get("results"), list):
-                rows.extend(data["results"])
-            elif isinstance(data, list):
-                rows.extend(data)
-    return rows
-
-
-def group_rows_by_date(rows: List[Dict[str, object]]) -> Dict[date, List[Dict[str, object]]]:
-    grouped: Dict[date, List[Dict[str, object]]] = defaultdict(list)
-    for row in rows:
-        report_date = _parse_row_date(row)
-        if not report_date:
-            continue
-        grouped[report_date].append(row)
-    return grouped
-
-
 def _parse_row_date(row: Dict[str, object]) -> date | None:
     for key in ["report_date", "report date", "reportdate", "Report Date"]:
         value = row.get(key)

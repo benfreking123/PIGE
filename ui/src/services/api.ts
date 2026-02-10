@@ -49,6 +49,4 @@ export const api = {
   runReport: (id: string) => request(`/reports/${id}/run`, { method: "POST" }),
   getAlerts: () => request<AlertState[]>("/alerts"),
   getLogs: () => request<LogEvent[]>("/logs"),
-  clearData: () =>
-    request("/admin/clear-data", { method: "POST", body: JSON.stringify({ confirm: true }) }),
 };

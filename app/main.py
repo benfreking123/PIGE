@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any, Dict, List, Optional
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,8 +14,7 @@ from app.db.session import SessionLocal
 from app.registry import RECIPIENTS, get_reports, report_config_from_dict, set_report_overrides
 from app.scheduler import SchedulerService
 from app.services.logging import configure_logging
-from app.services.gather import fetch_range_payloads, fetch_range_rows, group_rows_by_date
-from app.workers.hg201_cme_index import HG201CmeIndexWorker
+from app.services.gather import fetch_range_payloads
 from app.workers.registry import get_worker, init_workers, reload_workers
 
 
@@ -188,24 +187,13 @@ def api_report_gather(report_id: str, payload: Dict[str, Any] = Body(...)) -> Di
     if not worker:
         raise HTTPException(status_code=404, detail="Worker not found")
 
-    if report_id == "HG201_CME_INDEX":
-        rows = fetch_range_rows(report, start, end)
-        if not rows:
-            return {"status": "ok", "inserted": 0, "skipped": 0}
-        grouped = group_rows_by_date(rows)
-        payloads_by_date = {day: [rows] for day in grouped.keys()}
-    else:
-        payloads_by_date = fetch_range_payloads(report, start, end)
+    payloads_by_date = fetch_range_payloads(report, start, end)
     inserted = 0
     skipped = 0
     with SessionLocal() as db:
         for report_date, payloads in payloads_by_date.items():
-            if report_id == "HG201_CME_INDEX":
-                parsed_fields = _compute_hg201_day(rows, report_date)
-                payload_hash = worker.compute_hash_from_payloads([rows])
-            else:
-                parsed_fields = worker._parse(payloads, report_date)
-                payload_hash = worker.compute_hash_from_payloads(payloads)
+            parsed_fields = worker._parse(payloads, report_date)
+            payload_hash = worker.compute_hash_from_payloads(payloads)
             existing = (
                 db.query(ReportVersion)
                 .filter(
@@ -216,10 +204,6 @@ def api_report_gather(report_id: str, payload: Dict[str, Any] = Body(...)) -> Di
                 .first()
             )
             if existing:
-                existing.parsed_fields = worker._merge_parsed_fields(
-                    existing.parsed_fields or {}, parsed_fields
-                )
-                db.add(existing)
                 skipped += 1
                 continue
             version = ReportVersion(
@@ -274,16 +258,6 @@ def api_logs(limit: int = 200) -> List[dict]:
         }
         for event in events
     ]
-
-
-@app.post("/api/admin/clear-data")
-def api_clear_data(payload: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
-    if payload.get("confirm") is not True:
-        raise HTTPException(status_code=400, detail="confirm=true required")
-    with SessionLocal() as db:
-        db.execute(text("TRUNCATE report_run_events, report_runs, report_versions, alert_state RESTART IDENTITY"))
-        db.commit()
-    return {"status": "cleared"}
 
 
 @app.get("/reports")
@@ -342,7 +316,6 @@ def _seed_registry() -> None:
                 db.add(Report(id=report.report_id, name=report.name, config=report.to_db_config()))
             else:
                 merged = _merge_missing(existing.config or {}, report.to_db_config())
-                merged = _upgrade_report_config(report.report_id, merged, report.to_db_config())
                 if merged != existing.config:
                     existing.config = merged
                     existing.name = report.name
@@ -394,23 +367,6 @@ def _merge_missing(current: Dict[str, Any], default: Dict[str, Any]) -> Dict[str
     return merged
 
 
-def _upgrade_report_config(report_id: str, current: Dict[str, Any], default: Dict[str, Any]) -> Dict[str, Any]:
-    updated = dict(current)
-    if report_id == "PK600_AFTERNOON_CUTOUT":
-        schema = updated.get("schema", {})
-        required = schema.get("required_fields")
-        if required == ["cutout_value", "primal_value"]:
-            schema["required_fields"] = default.get("schema", {}).get("required_fields", required)
-            updated["schema"] = schema
-    if report_id == "HG201_CME_INDEX":
-        schema = updated.get("schema", {})
-        required = schema.get("required_fields")
-        if required == ["avg_net_price", "head_count"]:
-            schema["required_fields"] = default.get("schema", {}).get("required_fields", required)
-            updated["schema"] = schema
-    return updated
-
-
 def _parse_date(value: Optional[str]) -> date:
     if not value:
         raise HTTPException(status_code=400, detail="Missing date")
@@ -418,11 +374,6 @@ def _parse_date(value: Optional[str]) -> date:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Invalid date format (expected YYYY-MM-DD)") from exc
-
-
-def _compute_hg201_day(rows: List[Dict[str, Any]], report_date: date) -> Dict[str, Any]:
-    worker = HG201CmeIndexWorker.__new__(HG201CmeIndexWorker)
-    return worker.compute_index_for_date(rows, report_date)
 
 
 def _run_to_dict(run: ReportRun | None) -> dict | None:
