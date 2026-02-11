@@ -1,7 +1,9 @@
 export type Health = {
   status: string;
   db_ok: boolean;
+  db_ping_ms?: number | null;
   scheduler_running: boolean;
+  uptime_seconds?: number;
 };
 
 export type ReportRun = {
@@ -60,6 +62,7 @@ export type AlertState = {
 
 export type LogEvent = {
   run_id: string;
+  report_id: string;
   event_type: string;
   message: string | null;
   data: Record<string, unknown> | null;

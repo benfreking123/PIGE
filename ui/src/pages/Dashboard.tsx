@@ -42,7 +42,12 @@ export default function Dashboard() {
           <div>Health</div>
           <div>Status: {health?.status || "unknown"}</div>
           <div>DB: {health?.db_ok ? "ok" : "down"}</div>
+          <div>DB Ping: {health?.db_ping_ms ? `${health.db_ping_ms.toFixed(1)} ms` : "n/a"}</div>
           <div>Scheduler: {health?.scheduler_running ? "running" : "stopped"}</div>
+          <div>
+            Uptime:{" "}
+            {health?.uptime_seconds ? `${Math.floor(health.uptime_seconds / 60)} min` : "n/a"}
+          </div>
         </div>
         <div className="card">
           <div>Report States</div>

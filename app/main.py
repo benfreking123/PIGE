@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any, Dict, List, Optional
 from datetime import date, datetime, timedelta
 
@@ -13,6 +14,7 @@ from app.db.models import AlertState, Recipient, RecipientReport, Report, Report
 from app.db.session import SessionLocal
 from app.registry import RECIPIENTS, get_reports, report_config_from_dict, set_report_overrides
 from app.scheduler import SchedulerService
+from app.services.email import EmailService
 from app.services.logging import configure_logging
 from app.services.gather import fetch_range_payloads, fetch_range_rows, group_rows_by_date
 from app.workers.hg201_cme_index import HG201CmeIndexWorker
@@ -20,6 +22,7 @@ from app.workers.registry import get_worker, init_workers, reload_workers
 
 
 app = FastAPI(title=settings.app_name)
+_START_TIME = datetime.utcnow()
 scheduler = SchedulerService()
 cors_kwargs = {
     "allow_origins": settings.cors_origin_list(),
@@ -54,12 +57,22 @@ def health() -> dict:
 @app.get("/api/health")
 def api_health() -> dict:
     db_ok = True
+    db_ping_ms: Optional[float] = None
     try:
         with SessionLocal() as db:
+            start = time.perf_counter()
             db.execute(text("select 1"))
+            db_ping_ms = (time.perf_counter() - start) * 1000
     except Exception:
         db_ok = False
-    return {"status": "ok", "db_ok": db_ok, "scheduler_running": scheduler.scheduler.running}
+    uptime_seconds = (datetime.utcnow() - _START_TIME).total_seconds()
+    return {
+        "status": "ok",
+        "db_ok": db_ok,
+        "db_ping_ms": db_ping_ms,
+        "scheduler_running": scheduler.scheduler.running,
+        "uptime_seconds": uptime_seconds,
+    }
 
 
 @app.get("/api/reports")
@@ -261,7 +274,8 @@ def api_alerts() -> List[dict]:
 def api_logs(limit: int = 200) -> List[dict]:
     with SessionLocal() as db:
         events = (
-            db.query(ReportRunEvent)
+            db.query(ReportRunEvent, ReportRun)
+            .join(ReportRun, ReportRun.id == ReportRunEvent.report_run_id)
             .order_by(ReportRunEvent.created_at.desc())
             .limit(limit)
             .all()
@@ -269,13 +283,42 @@ def api_logs(limit: int = 200) -> List[dict]:
     return [
         {
             "run_id": event.report_run_id,
+            "report_id": run.report_id,
             "event_type": event.event_type,
             "message": event.message,
             "data": event.data,
             "created_at": event.created_at.isoformat(),
         }
-        for event in events
+        for event, run in events
     ]
+
+
+@app.post("/api/logs/test-alert")
+def api_logs_test_alert() -> dict:
+    """Send a test alert email to the configured master alert address to verify email/SES."""
+    try:
+        email_service = EmailService()
+        if not email_service.enabled:
+            raise HTTPException(status_code=400, detail="Email is disabled (EMAIL_ENABLED=false)")
+        payload = email_service.render(
+            "alert",
+            {
+                "subject": "USDA Monitor – Test Alert",
+                "report_id": "test",
+                "run_id": "test",
+                "error_type": "test_alert",
+                "last_attempt_at": datetime.utcnow().isoformat() + "Z",
+            },
+        )
+        email_service.send([settings.master_alert_email], payload)
+        return {"status": "sent", "recipient": settings.master_alert_email}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to send test alert: {type(e).__name__}: {e!s}",
+        )
 
 
 @app.post("/api/logs/clear")

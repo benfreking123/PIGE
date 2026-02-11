@@ -73,7 +73,7 @@ REPORTS: List[ReportConfig] = [
         report_id="PK600_MORNING_CASH",
         name="PK600 Morning Cash",
         endpoints=[EndpointConfig(2674, "National Volume and Price Data")],
-        windows=[PollingWindow(start=time(6, 30), end=time(9, 0))],
+        windows=[PollingWindow(start=time(10, 0), end=time(12, 0))],
         polling=PollingRule(
             inside_cadence_sec=300,
             outside_cadence_sec=900,
@@ -95,7 +95,7 @@ REPORTS: List[ReportConfig] = [
         report_id="PK600_AFTERNOON_CASH",
         name="PK600 Afternoon Cash",
         endpoints=[EndpointConfig(2675, "National Volume and Price Data")],
-        windows=[PollingWindow(start=time(12, 0), end=time(14, 30))],
+        windows=[PollingWindow(start=time(14, 0), end=time(16, 0))],
         polling=PollingRule(
             inside_cadence_sec=300,
             outside_cadence_sec=900,
@@ -120,7 +120,7 @@ REPORTS: List[ReportConfig] = [
             EndpointConfig(2498, "Cutout and Primal Values"),
             EndpointConfig(2498, "Change From Prior Day"),
         ],
-        windows=[PollingWindow(start=time(12, 0), end=time(14, 30))],
+        windows=[PollingWindow(start=time(14, 0), end=time(16, 0))],
         polling=PollingRule(
             inside_cadence_sec=300,
             outside_cadence_sec=900,
@@ -162,7 +162,7 @@ REPORTS: List[ReportConfig] = [
             EndpointConfig(2453, "Change From Prior Day"),
             EndpointConfig(2453, "Current Volume"),
         ],
-        windows=[PollingWindow(start=time(12, 0), end=time(15, 0))],
+        windows=[PollingWindow(start=time(14, 0), end=time(16, 0))],
         polling=PollingRule(
             inside_cadence_sec=300,
             outside_cadence_sec=900,
@@ -184,7 +184,7 @@ REPORTS: List[ReportConfig] = [
         report_id="HG201_CME_INDEX",
         name="HG201 CME Index",
         endpoints=[EndpointConfig(2511, "Barrows/Gilts")],
-        windows=[PollingWindow(start=time(13, 0), end=time(16, 30))],
+        windows=[PollingWindow(start=time(9, 30), end=time(11, 30))],
         polling=PollingRule(
             inside_cadence_sec=600,
             outside_cadence_sec=1800,
@@ -219,7 +219,7 @@ REPORTS: List[ReportConfig] = [
         report_id="PK600_MORNING_CUTOUT_PDF",
         name="PK600 Morning Pork Cutout (PDF)",
         endpoints=[EndpointConfig(0, "", absolute_url="https://www.ams.usda.gov/mnreports/ams_2496.pdf")],
-        windows=[PollingWindow(start=time(6, 30), end=time(9, 0))],
+        windows=[PollingWindow(start=time(10, 0), end=time(12, 0))],
         polling=PollingRule(
             inside_cadence_sec=600,
             outside_cadence_sec=1800,

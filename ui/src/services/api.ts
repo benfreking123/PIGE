@@ -53,4 +53,6 @@ export const api = {
     request<{ deleted_events: number; deleted_runs: number; deleted_versions: number }>("/logs/clear", {
       method: "POST",
     }),
+  sendTestAlert: () =>
+    request<{ status: string; recipient: string }>("/logs/test-alert", { method: "POST" }),
 };
