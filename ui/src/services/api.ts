@@ -3,6 +3,7 @@ import {
   Health,
   LogEvent,
   HistoricalRow,
+  Recipient,
   ReportConfig,
   ReportLatest,
   ReportRun,
@@ -18,7 +19,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text || res.statusText);
+    if (text) {
+      try {
+        const parsed = JSON.parse(text) as { detail?: string };
+        throw new Error(parsed.detail || text);
+      } catch {
+        throw new Error(text);
+      }
+    }
+    throw new Error(res.statusText);
   }
   return res.json() as Promise<T>;
 }
@@ -48,6 +57,26 @@ export const api = {
     }),
   runReport: (id: string) => request(`/reports/${id}/run`, { method: "POST" }),
   getAlerts: () => request<AlertState[]>("/alerts"),
+  getRecipients: () => request<Recipient[]>("/recipients"),
+  createRecipient: (payload: { email: string; name?: string | null; is_active?: boolean; report_ids?: string[] }) =>
+    request<{ status: string; id: string }>("/recipients", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateRecipient: (id: string, payload: { email?: string; name?: string | null; is_active?: boolean }) =>
+    request<{ status: string }>(`/recipients/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  updateRecipientReports: (id: string, payload: { report_ids: string[] }) =>
+    request<{ status: string; report_ids: string[] }>(`/recipients/${id}/reports`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  deleteRecipient: (id: string) =>
+    request<{ status: string }>(`/recipients/${id}`, {
+      method: "DELETE",
+    }),
   getLogs: () => request<LogEvent[]>("/logs"),
   clearReportData: () =>
     request<{ deleted_events: number; deleted_runs: number; deleted_versions: number }>("/logs/clear", {

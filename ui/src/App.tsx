@@ -6,6 +6,7 @@ import ReportSettings from "./pages/ReportSettings";
 import Historicals from "./pages/Historicals";
 import Logs from "./pages/Logs";
 import Alerts from "./pages/Alerts";
+import Recipients from "./pages/Recipients";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
             Dashboard
           </NavLink>
           <NavLink to="/reports">Reports</NavLink>
+          <NavLink to="/recipients">Recipients</NavLink>
           <NavLink to="/logs">Logs</NavLink>
           <NavLink to="/alerts">Alerts</NavLink>
         </nav>
@@ -28,6 +30,7 @@ export default function App() {
           <Route path="/reports/:id" element={<ReportDetail />} />
           <Route path="/reports/:id/settings" element={<ReportSettings />} />
           <Route path="/reports/:id/historicals" element={<Historicals />} />
+          <Route path="/recipients" element={<Recipients />} />
           <Route path="/logs" element={<Logs />} />
           <Route path="/alerts" element={<Alerts />} />
         </Routes>

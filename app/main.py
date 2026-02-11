@@ -8,6 +8,7 @@ from datetime import date, datetime, timedelta
 from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
 from app.db.models import AlertState, Recipient, RecipientReport, Report, ReportRun, ReportRunEvent, ReportVersion
@@ -270,6 +271,94 @@ def api_alerts() -> List[dict]:
     ]
 
 
+@app.get("/api/recipients")
+def api_recipients() -> List[dict]:
+    with SessionLocal() as db:
+        recipients = db.query(Recipient).order_by(Recipient.email.asc()).all()
+        links = db.query(RecipientReport).all()
+    report_ids_by_recipient: Dict[str, List[str]] = {}
+    for link in links:
+        report_ids_by_recipient.setdefault(link.recipient_id, []).append(link.report_id)
+    return [
+        {
+            "id": recipient.id,
+            "email": recipient.email,
+            "name": recipient.name,
+            "is_active": recipient.is_active,
+            "report_ids": sorted(report_ids_by_recipient.get(recipient.id, [])),
+        }
+        for recipient in recipients
+    ]
+
+
+@app.post("/api/recipients")
+def api_recipients_create(payload: Dict[str, Any] = Body(...)) -> dict:
+    email = _validate_recipient_email(payload.get("email"))
+    name = _clean_optional_string(payload.get("name"))
+    is_active = bool(payload.get("is_active", True))
+    report_ids = _validate_report_ids(payload.get("report_ids", []))
+
+    with SessionLocal() as db:
+        try:
+            recipient = Recipient(email=email, name=name, is_active=is_active)
+            db.add(recipient)
+            db.flush()
+            recipient_id = recipient.id
+            for report_id in report_ids:
+                db.add(RecipientReport(recipient_id=recipient.id, report_id=report_id))
+            db.commit()
+        except IntegrityError as exc:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Recipient email already exists") from exc
+    return {"status": "created", "id": recipient_id}
+
+
+@app.put("/api/recipients/{recipient_id}")
+def api_recipients_update(recipient_id: str, payload: Dict[str, Any] = Body(...)) -> dict:
+    with SessionLocal() as db:
+        recipient = db.get(Recipient, recipient_id)
+        if not recipient:
+            raise HTTPException(status_code=404, detail="Recipient not found")
+        if "email" in payload:
+            recipient.email = _validate_recipient_email(payload.get("email"))
+        if "name" in payload:
+            recipient.name = _clean_optional_string(payload.get("name"))
+        if "is_active" in payload:
+            recipient.is_active = bool(payload.get("is_active"))
+        try:
+            db.commit()
+        except IntegrityError as exc:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Recipient email already exists") from exc
+    return {"status": "updated"}
+
+
+@app.put("/api/recipients/{recipient_id}/reports")
+def api_recipients_update_reports(recipient_id: str, payload: Dict[str, Any] = Body(...)) -> dict:
+    report_ids = _validate_report_ids(payload.get("report_ids"))
+    with SessionLocal() as db:
+        recipient = db.get(Recipient, recipient_id)
+        if not recipient:
+            raise HTTPException(status_code=404, detail="Recipient not found")
+        db.query(RecipientReport).filter(RecipientReport.recipient_id == recipient_id).delete()
+        for report_id in report_ids:
+            db.add(RecipientReport(recipient_id=recipient_id, report_id=report_id))
+        db.commit()
+    return {"status": "updated", "report_ids": report_ids}
+
+
+@app.delete("/api/recipients/{recipient_id}")
+def api_recipients_delete(recipient_id: str) -> dict:
+    with SessionLocal() as db:
+        recipient = db.get(Recipient, recipient_id)
+        if not recipient:
+            raise HTTPException(status_code=404, detail="Recipient not found")
+        db.query(RecipientReport).filter(RecipientReport.recipient_id == recipient_id).delete()
+        db.delete(recipient)
+        db.commit()
+    return {"status": "deleted"}
+
+
 @app.get("/api/logs")
 def api_logs(limit: int = 200) -> List[dict]:
     with SessionLocal() as db:
@@ -468,6 +557,46 @@ def _parse_date(value: Optional[str]) -> date:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Invalid date format (expected YYYY-MM-DD)") from exc
+
+
+def _validate_recipient_email(value: Any) -> str:
+    email = str(value or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Recipient email is required")
+    if "@" not in email:
+        raise HTTPException(status_code=400, detail="Recipient email must contain '@'")
+    local, _, domain = email.partition("@")
+    if not local or "." not in domain:
+        raise HTTPException(status_code=400, detail="Recipient email format is invalid")
+    return email
+
+
+def _clean_optional_string(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    cleaned = str(value).strip()
+    return cleaned or None
+
+
+def _validate_report_ids(value: Any) -> List[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise HTTPException(status_code=400, detail="report_ids must be an array of report ids")
+    known_report_ids = {report.report_id for report in get_reports()}
+    deduped: List[str] = []
+    seen = set()
+    for raw in value:
+        rid = str(raw).strip()
+        if not rid:
+            continue
+        if rid not in known_report_ids:
+            raise HTTPException(status_code=400, detail=f"Unknown report id: {rid}")
+        if rid in seen:
+            continue
+        seen.add(rid)
+        deduped.append(rid)
+    return deduped
 
 
 def _compute_hg201_day(rows: List[Dict[str, Any]], report_date: date) -> Dict[str, Any]:

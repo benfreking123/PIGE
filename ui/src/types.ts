@@ -68,3 +68,11 @@ export type LogEvent = {
   data: Record<string, unknown> | null;
   created_at: string;
 };
+
+export type Recipient = {
+  id: string;
+  email: string;
+  name: string | null;
+  is_active: boolean;
+  report_ids: string[];
+};
