@@ -3,10 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List
 
+import logging
+
 import boto3
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -42,14 +46,18 @@ class EmailService:
             return
         if not self.client:
             return
-        self.client.send_email(
-            Source=settings.ses_sender,
-            Destination={"ToAddresses": recipients},
-            Message={
-                "Subject": {"Data": payload.subject},
-                "Body": {
-                    "Text": {"Data": payload.body_text},
-                    "Html": {"Data": payload.body_html},
-                },
-            },
-        )
+        for recipient in recipients:
+            try:
+                self.client.send_email(
+                    Source=settings.ses_sender,
+                    Destination={"ToAddresses": [recipient]},
+                    Message={
+                        "Subject": {"Data": payload.subject},
+                        "Body": {
+                            "Text": {"Data": payload.body_text},
+                            "Html": {"Data": payload.body_html},
+                        },
+                    },
+                )
+            except Exception as exc:
+                logger.exception("email send failed", extra={"recipient": recipient, "error": str(exc)})

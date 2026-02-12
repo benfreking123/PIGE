@@ -213,7 +213,13 @@ class BaseWorker:
                 "urls": urls,
             },
         )
-        self.email_service.send(recipients, payload)
+        try:
+            self.email_service.send(recipients, payload)
+        except Exception as exc:
+            logger.exception(
+                "email send failed",
+                extra={"report_id": self.config.report_id, "error": str(exc)},
+            )
 
     def _get_recipients(self) -> List[str]:
         with SessionLocal() as db:

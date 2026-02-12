@@ -1,0 +1,27 @@
+
+Databento Historicals 
+https://databento.com/docs/examples/basics-historical/historical-introduction/
+
+To get cost of each querry: https://databento.com/docs/api-reference-historical/metadata/metadata-get-cost
+Use metadata.get_cost.
+
+Databento Example:
+
+import databento as db
+
+historical_client = db.Historical("db-qtnsHtX38URGrqt8D7yHibUWbmMPB")
+
+schemas = historical_client.metadata.list_schemas("GLBX.MDP3")
+print(schemas)
+
+dataset_range = historical_client.metadata.get_dataset_range("GLBX.MDP3")
+print(dataset_range)
+
+cost = historical_client.metadata.get_cost(
+    dataset="GLBX.MDP3",
+    schema="mbo",
+    symbols="ESZ5",
+    start="2025-11-16",
+    end="2025-11-22",
+)
+print(f"Total cost = ${cost:.2f}")
