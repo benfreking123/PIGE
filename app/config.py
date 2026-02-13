@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     max_concurrency: int = 4
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     cors_origin_regex: str | None = None
+    databento_apikey: str = ""
+    api_ninja_apikey: str = ""
+    market_job_poll_seconds: int = 300
+    market_quote_refresh_seconds: int = 300
 
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

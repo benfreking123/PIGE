@@ -3,6 +3,9 @@ import {
   Health,
   LogEvent,
   HistoricalRow,
+  MarketHistoryRow,
+  MarketHistoryMeta,
+  MarketQuote,
   Recipient,
   ReportConfig,
   ReportLatest,
@@ -84,4 +87,51 @@ export const api = {
     }),
   sendTestAlert: () =>
     request<{ status: string; recipient: string }>("/logs/test-alert", { method: "POST" }),
+  getMarketContracts: () => request<{ symbols: string[] }>("/markets/contracts"),
+  getMarketQuoteSymbols: () => request<{ symbols: string[] }>("/markets/quote-symbols"),
+  getMarketQuotes: (symbols?: string[]) => {
+    const params = symbols && symbols.length ? `?symbols=${symbols.join(",")}` : "";
+    return request<MarketQuote[]>(`/markets/quotes${params}`);
+  },
+  refreshMarketQuotes: (symbols?: string[]) =>
+    request<{ status: string; updated: number; failed?: string[] }>("/markets/quotes/refresh", {
+      method: "POST",
+      body: JSON.stringify({ symbols }),
+    }),
+  getMarketHistory: (symbol: string, start?: string, end?: string) => {
+    const params = new URLSearchParams({ symbol });
+    if (start) params.set("start_date", start);
+    if (end) params.set("end_date", end);
+    return request<MarketHistoryRow[]>(`/markets/history?${params.toString()}`);
+  },
+  getMarketHistoryMeta: (symbol: string) => {
+    const params = new URLSearchParams({ symbol });
+    return request<MarketHistoryMeta>(`/markets/history/meta?${params.toString()}`);
+  },
+  getBackfillCost: (start: string, end: string) =>
+    request<{ estimated_cost: number; symbol_count: number }>("/markets/backfill/cost", {
+      method: "POST",
+      body: JSON.stringify({ start_date: start, end_date: end }),
+    }),
+  runBackfill: (start: string, end: string) =>
+    request<{ job_id: string; status: string }>("/markets/backfill/run", {
+      method: "POST",
+      body: JSON.stringify({ start_date: start, end_date: end }),
+    }),
+  runTestBackfill: (start: string, end: string) =>
+    request<{ job_id: string; status: string; symbols: string[] }>("/markets/backfill/test", {
+      method: "POST",
+      body: JSON.stringify({ start_date: start, end_date: end }),
+    }),
+  getBackfillJobs: () =>
+    request<
+      {
+        job_id: string;
+        status: string;
+        start_date: string;
+        end_date: string;
+        updated_at: string;
+        last_error?: string | null;
+      }[]
+    >("/markets/backfill/jobs"),
 };

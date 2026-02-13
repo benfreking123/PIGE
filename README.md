@@ -37,6 +37,13 @@ Optionally specify a date:
 - `POST /api/reports/{id}/run`
 - `GET /api/logs`
 - `GET /api/alerts`
+- `GET /api/markets/contracts`
+- `GET /api/markets/quote-symbols`
+- `GET /api/markets/quotes`
+- `GET /api/markets/history`
+- `POST /api/markets/backfill/cost`
+- `POST /api/markets/backfill/run`
+- `GET /api/markets/backfill/jobs`
 
 ## AWS SES on EC2
 - Do not set AWS keys in `.env` on EC2.
@@ -49,6 +56,10 @@ Registry and schedules live in `app/registry.py`. It defines:
 - Time windows and cadence
 - Whether prior day lookup is needed
 - Recipient subscriptions
+
+Market data services require:
+- `DATABENTO_APIKEY` for historical OHLCV-1d backfill
+- `API_NINJA_APIKEY` for current contract quotes
 
 ## Tests
 Run tests locally:

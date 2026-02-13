@@ -9,7 +9,9 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Float,
     Integer,
+    Index,
     String,
     Text,
     UniqueConstraint,
@@ -114,4 +116,48 @@ class AlertState(Base):
     report_id = Column(String, primary_key=True)
     consecutive_failures = Column(Integer, default=0, nullable=False)
     last_failure_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class MarketOhlcv1d(Base):
+    __tablename__ = "market_ohlcv_1d"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    symbol = Column(String, nullable=False)
+    trade_date = Column(Date, nullable=False)
+    open = Column(Float, nullable=True)
+    high = Column(Float, nullable=True)
+    low = Column(Float, nullable=True)
+    close = Column(Float, nullable=True)
+    volume = Column(Float, nullable=True)
+    open_interest = Column(Float, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("symbol", "trade_date", name="uq_market_ohlcv_symbol_date"),
+        Index("ix_market_ohlcv_symbol_date", "symbol", "trade_date"),
+    )
+
+
+class MarketBatchJob(Base):
+    __tablename__ = "market_batch_jobs"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    job_id = Column(String, nullable=False, unique=True)
+    symbols = Column(JSONB, nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    status = Column(String, nullable=False)
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class MarketQuote(Base):
+    __tablename__ = "market_quotes"
+
+    symbol = Column(String, primary_key=True)
+    price = Column(Float, nullable=True)
+    last_update = Column(String, nullable=True)
+    raw_payload = Column(JSONB, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)

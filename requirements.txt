@@ -13,3 +13,5 @@ python-dotenv==1.0.1
 pytest==8.3.2
 pytest-asyncio==0.23.8
 pdfplumber==0.11.4
+databento==0.70.0
+pandas==2.2.3

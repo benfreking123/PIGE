@@ -7,18 +7,26 @@ from datetime import date, datetime, timedelta
 
 from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
-from app.db.models import AlertState, Recipient, RecipientReport, Report, ReportRun, ReportRunEvent, ReportVersion
+from app.db.models import (
+    AlertState,
+    MarketBatchJob,
+    Recipient,
+    RecipientReport,
+    Report,
+    ReportRun,
+    ReportRunEvent,
+    ReportVersion,
+)
 from app.db.session import SessionLocal
 from app.registry import RECIPIENTS, get_reports, report_config_from_dict, set_report_overrides
 from app.scheduler import SchedulerService
-from app.services.email import EmailService
 from app.services.logging import configure_logging
-from app.services.gather import fetch_range_payloads, fetch_range_rows, group_rows_by_date
-from app.workers.hg201_cme_index import HG201CmeIndexWorker
+from app.services.gather import fetch_range_payloads
+from app.services.marketdata.service import MarketDataService
 from app.workers.registry import get_worker, init_workers, reload_workers
 
 
@@ -131,6 +139,119 @@ def api_report_latest(report_id: str) -> dict:
         "source_urls": raw_payload.get("urls", []),
         "created_at": version.created_at.isoformat(),
     }
+
+
+@app.get("/api/markets/contracts")
+def api_markets_contracts() -> Dict[str, object]:
+    service = _get_market_service()
+    symbols = service.symbol_range_history()
+    return {"symbols": symbols}
+
+
+@app.get("/api/markets/quote-symbols")
+def api_markets_quote_symbols() -> Dict[str, object]:
+    service = _get_market_service()
+    symbols = service.symbol_range_quotes()
+    return {"symbols": symbols}
+
+
+@app.get("/api/markets/quotes")
+def api_markets_quotes(symbols: Optional[str] = None) -> List[Dict[str, object]]:
+    service = _get_market_service()
+    symbol_list = symbols.split(",") if symbols else service.symbol_range_quotes()
+    with SessionLocal() as db:
+        return service.cached_quotes(db, symbol_list)
+
+
+@app.post("/api/markets/quotes/refresh")
+def api_markets_quotes_refresh(payload: Dict[str, Any] = Body(default={})) -> Dict[str, object]:
+    service = _get_market_service()
+    symbols = payload.get("symbols")
+    symbol_list = symbols if isinstance(symbols, list) else None
+    with SessionLocal() as db:
+        count, failed = service.refresh_quotes(db, symbol_list)
+        db.commit()
+    return {"status": "ok", "updated": count, "failed": failed}
+
+
+@app.get("/api/markets/history")
+def api_markets_history(symbol: str, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[Dict[str, object]]:
+    start = _parse_date(start_date) if start_date else None
+    end = _parse_date(end_date) if end_date else None
+    service = _get_market_service()
+    with SessionLocal() as db:
+        return service.get_history(db, symbol, start, end)
+
+
+@app.get("/api/markets/history/meta")
+def api_markets_history_meta(symbol: str) -> Dict[str, object]:
+    with SessionLocal() as db:
+        row = (
+            db.query(func.min(MarketOhlcv1d.trade_date), func.max(MarketOhlcv1d.trade_date))
+            .filter(MarketOhlcv1d.symbol == symbol)
+            .first()
+        )
+    if not row or not row[0] or not row[1]:
+        raise HTTPException(status_code=404, detail="No data for symbol")
+    return {"symbol": symbol, "min_date": row[0].isoformat(), "max_date": row[1].isoformat()}
+
+
+@app.post("/api/markets/backfill/cost")
+def api_markets_backfill_cost(payload: Dict[str, Any] = Body(...)) -> Dict[str, object]:
+    start = _parse_date(payload.get("start_date"))
+    end = _parse_date(payload.get("end_date"))
+    if start > end:
+        raise HTTPException(status_code=400, detail="start_date must be <= end_date")
+    service = _get_market_service()
+    cost = service.estimate_backfill_cost(start, end)
+    symbols = service.symbol_range_history()
+    return {"estimated_cost": cost, "symbol_count": len(symbols)}
+
+
+@app.post("/api/markets/backfill/run")
+def api_markets_backfill_run(payload: Dict[str, Any] = Body(...)) -> Dict[str, object]:
+    start = _parse_date(payload.get("start_date"))
+    end = _parse_date(payload.get("end_date"))
+    if start > end:
+        raise HTTPException(status_code=400, detail="start_date must be <= end_date")
+    service = _get_market_service()
+    with SessionLocal() as db:
+        job = service.submit_backfill_job(db, start, end)
+    return {"job_id": job.job_id, "status": job.status}
+
+
+@app.post("/api/markets/backfill/test")
+def api_markets_backfill_test(payload: Dict[str, Any] = Body(...)) -> Dict[str, object]:
+    start = _parse_date(payload.get("start_date"))
+    end = _parse_date(payload.get("end_date"))
+    if start > end:
+        raise HTTPException(status_code=400, detail="start_date must be <= end_date")
+    service = _get_market_service()
+    with SessionLocal() as db:
+        job = service.submit_test_batch_job(db, start, end)
+    return {"job_id": job.job_id, "status": job.status, "symbols": job.symbols}
+
+
+@app.get("/api/markets/backfill/jobs")
+def api_markets_backfill_jobs(limit: int = 20) -> List[Dict[str, object]]:
+    with SessionLocal() as db:
+        jobs = (
+            db.query(MarketBatchJob)
+            .order_by(MarketBatchJob.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+    return [
+        {
+            "job_id": job.job_id,
+            "status": job.status,
+            "start_date": job.start_date.isoformat(),
+            "end_date": job.end_date.isoformat(),
+            "updated_at": job.updated_at.isoformat(),
+            "last_error": job.last_error,
+        }
+        for job in jobs
+    ]
 
 
 @app.get("/api/reports/{report_id}/historicals")
@@ -557,6 +678,13 @@ def _parse_date(value: Optional[str]) -> date:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Invalid date format (expected YYYY-MM-DD)") from exc
+
+
+def _get_market_service() -> MarketDataService:
+    try:
+        return MarketDataService()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 def _validate_recipient_email(value: Any) -> str:

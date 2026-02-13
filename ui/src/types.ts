@@ -69,6 +69,28 @@ export type LogEvent = {
   created_at: string;
 };
 
+export type MarketQuote = {
+  symbol?: string;
+  price?: number;
+  last_update?: string;
+};
+
+export type MarketHistoryRow = {
+  date: string;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  close: number | null;
+  volume: number | null;
+  open_interest: number | null;
+};
+
+export type MarketHistoryMeta = {
+  symbol: string;
+  min_date: string;
+  max_date: string;
+};
+
 export type Recipient = {
   id: string;
   email: string;

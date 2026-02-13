@@ -25,3 +25,99 @@ cost = historical_client.metadata.get_cost(
     end="2025-11-22",
 )
 print(f"Total cost = ${cost:.2f}")
+
+import databento as db
+
+historical_client = db.Historical("db-qtnsHtX38URGrqt8D7yHibUWbmMPB")
+
+dbn_store = historical_client.timeseries.get_range(
+    dataset="GLBX.MDP3",
+    schema="ohlcv-1h",
+    symbols="ESZ5",
+    start="2025-11-16",
+    end="2025-11-22",
+)
+
+for record in dbn_store:
+    print(record)
+
+or for large request 
+
+
+job = historical_client.batch.submit_job(
+    dataset="GLBX.MDP3",
+    schema="ohlcv-1m",
+    symbols="ESZ5",
+    start="2025-11-16",
+    end="2025-11-22",
+)
+
+
+Contract Months for Hogs:
+Leading Symbol: HE
+G - Feb 
+J - Apirl
+K - May 
+M - June 
+N - July 
+Q - August
+V - October 
+Z - December 
+
+
+API Ninja
+
+https://api-ninjas.com/api/commodityprice
+
+We can use this for price and last timestamp
+https://api.api-ninjas.com/v1/commoditycontract?symbol=GCK26
+
+This to gather symbols
+https://api.api-ninjas.com/v1/commoditycontractlist
+
+
+
+Databento best way to Programic Batch Downloads
+import operator
+import pathlib
+import time
+import databento as db
+
+# First, create a historical client
+client = db.Historical("db-qtnsHtX38URGrqt8D7yHibUWbmMPB")
+
+# Next, we will submit a batch job
+new_job = client.batch.submit_job(
+    dataset="GLBX.MDP3",
+    start="2022-12-12T00:00:00",
+    end="2022-12-17T00:00:00",
+    symbols="OZN.OPT",
+    schema="trades",
+    split_duration="day",
+    stype_in="parent",
+)
+
+# Retrieve the new job ID
+new_job_id: str = new_job["id"]
+
+# Now, we have to wait for our batch job to complete
+while True:
+    done_jobs = list(map(operator.itemgetter("id"), client.batch.list_jobs("done")))
+    if new_job_id in done_jobs:
+        break  # Exit the loop to continue
+    time.sleep(1.0)
+
+# Once complete, we will download the files
+downloaded_files = client.batch.download(
+    job_id=new_job_id,
+    output_dir=pathlib.Path.cwd(),
+)
+
+# Finally, we can load the data into a DBNStore for analysis
+for file in sorted(downloaded_files):
+    if file.name.endswith(".dbn.zst"):
+        data = db.DBNStore.from_file(file)
+
+        # Convert the data to a pandas.DataFrame
+        df = data.to_df()
+        print(f"{file.name} contains {len(df):,d} records")

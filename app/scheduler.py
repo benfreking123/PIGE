@@ -11,6 +11,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.config import settings
 from app.registry import ReportConfig, get_reports
+from app.db.session import SessionLocal
+from app.services.marketdata.service import MarketDataService
 from app.workers.registry import get_worker
 
 
@@ -23,9 +25,33 @@ class SchedulerService:
         self.state: Dict[str, Dict[str, object]] = {}
         self.semaphore = asyncio.Semaphore(settings.max_concurrency)
         self.tz = ZoneInfo(settings.app_timezone)
+        self.marketdata = (
+            MarketDataService()
+            if settings.databento_apikey or settings.api_ninja_apikey
+            else None
+        )
 
     def start(self) -> None:
         self.scheduler.add_job(self.tick, "interval", seconds=settings.poll_tick_seconds)
+        self.scheduler.add_job(
+            self.run_market_daily_update,
+            "cron",
+            hour=15,
+            minute=0,
+            timezone=self.tz,
+        )
+        self.scheduler.add_job(
+            self.poll_market_jobs,
+            "interval",
+            seconds=settings.market_job_poll_seconds,
+            timezone=self.tz,
+        )
+        self.scheduler.add_job(
+            self.refresh_market_quotes,
+            "interval",
+            seconds=settings.market_quote_refresh_seconds,
+            timezone=self.tz,
+        )
         self.scheduler.start()
 
     def shutdown(self) -> None:
@@ -71,3 +97,26 @@ class SchedulerService:
             else:
                 logger.error("worker error", extra={"report_id": report.report_id})
                 self.state[report.report_id]["error_count"] = self.state[report.report_id]["error_count"] + 1  # type: ignore[index]
+
+    async def run_market_daily_update(self) -> None:
+        if not self.marketdata:
+            return
+        with SessionLocal() as db:
+            self.marketdata.run_daily_update(db)
+
+    async def poll_market_jobs(self) -> None:
+        if not self.marketdata:
+            return
+        with SessionLocal() as db:
+            self.marketdata.poll_jobs(db)
+
+    async def refresh_market_quotes(self) -> None:
+        if not self.marketdata or not settings.api_ninja_apikey:
+            return
+        now = datetime.now(tz=self.tz)
+        start = now.replace(hour=8, minute=20, second=0, microsecond=0)
+        end = now.replace(hour=13, minute=30, second=0, microsecond=0)
+        if not (start <= now <= end):
+            return
+        with SessionLocal() as db:
+            self.marketdata.refresh_quotes(db)
